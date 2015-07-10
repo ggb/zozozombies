@@ -41,6 +41,7 @@ type alias Player =
     , target:Position
     , noiseGeneratorCount:Int
     , direction:Direction
+    , imgNumber:Int
     }
 
 type ZombieState
@@ -48,11 +49,17 @@ type ZombieState
     | Aggressive
     | Hunting
 
+type ZombieType
+    = Brainy
+    | Frankenstein
+
 type alias Zombie =
     { position:Position
     , target:Position
     , state:ZombieState
     , direction:Direction
+    , imgNumber:Int
+    , zombieType:ZombieType
     }
 
 type alias Wall =
@@ -78,11 +85,11 @@ type alias Game =
 initialGame : Game
 initialGame =
     ( Start
-    , { position=(-200,0), target=(200,0), noiseGeneratorCount=3, direction=East }
-    , [ { position=(100,100), target=(0,0), state=Idle, direction=West }
-      , { position=(100,-100), target=(0,0), state=Idle, direction=West }
-      , { position=(100,0), target=(0,0), state=Idle, direction=North }
-      , { position=(250,50), target=(0,0), state=Idle, direction=South }
+    , { position=(-200,0), target=(200,0), noiseGeneratorCount=3, direction=East, imgNumber=0 }
+    , [ { position=(100,100), target=(0,0), state=Idle, direction=West, imgNumber=0, zombieType=Frankenstein }
+      , { position=(100,-100), target=(0,0), state=Idle, direction=West, imgNumber=0, zombieType=Frankenstein }
+      , { position=(100,0), target=(0,0), state=Idle, direction=North, imgNumber=0, zombieType=Brainy }
+      , { position=(250,50), target=(0,0), state=Idle, direction=South, imgNumber=0, zombieType=Brainy }
       ]
     , []
     , []
@@ -221,8 +228,11 @@ moveCharacter userInput player =
   let (xPos,yPos) = player.position
       newPos = ( xPos + userInput.x * moveFactor, yPos + userInput.y * moveFactor )
       newDirection = directionHelper userInput
+      newImgNumber = (player.imgNumber + 1) % 6
   in
-    { player | position <- newPos, direction <- newDirection }
+    { player | position <- newPos
+             , direction <- newDirection
+             , imgNumber <- newImgNumber }
 
 
 updateZombieState : Zombie -> Player -> List NoiseGenerator -> ZombieState
@@ -231,7 +241,7 @@ updateZombieState zombie player noise =
       pPos = player.position
       distance = euclidianDistance zPos pPos
   in
-    if | distance < 100  -> Hunting
+    if | distance < 125 -> Hunting
        | distance < 200 -> Aggressive
        | otherwise      -> Idle
 
@@ -262,8 +272,12 @@ idleZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
 idleZombieMove zombie target noise heading =
   let newPos   = zombieMoveHelper zombie.position zombieMoveFactor heading
       newState = updateZombieState zombie target noise
+      newImgNumber = (zombie.imgNumber + 1) % 6
   in
-    { zombie | position <- newPos, direction <- heading, state <- newState }
+    { zombie | position  <- newPos
+             , direction <- heading
+             , state     <- newState
+             , imgNumber <- newImgNumber}
 
 
 aggressiveZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
@@ -271,8 +285,11 @@ aggressiveZombieMove zombie target noise heading =
   let newPos   = zombieMoveHelper zombie.position zombieMoveFactor
                  <| determineDirection zombie target.position
       newState = updateZombieState zombie target noise
+      newImgNumber = (zombie.imgNumber + 1) % 6
   in
-    { zombie | position <- newPos, state <- newState }
+    { zombie | position  <- newPos
+             , state     <- newState
+             , imgNumber <- newImgNumber }
 
 
 huntingZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
@@ -280,8 +297,11 @@ huntingZombieMove zombie target noise heading =
   let newPos  = zombieMoveHelper zombie.position 3
                 <| determineDirection zombie target.position
       newState = updateZombieState zombie target noise
+      newImgNumber = (zombie.imgNumber + 1) % 6
   in
-    { zombie | position <- newPos, state <- newState }
+    { zombie | position  <- newPos
+             , state     <- newState
+             , imgNumber <- newImgNumber }
 
 
 moveZombie : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
