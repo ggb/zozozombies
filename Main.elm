@@ -3,7 +3,7 @@ module Game where
 import Time
 import Color
 import Signal
-import Random exposing (Seed)
+import Random exposing (Generator,Seed)
 import Keyboard
 import Text
 import Graphics.Collage exposing (..)
@@ -15,10 +15,13 @@ Model and Constants
 
 -}
 
-moveFactor : number
+moveFactor : Int
 moveFactor = 3
 
-windowDimension : (number, number')
+zombieMoveFactor : Int
+zombieMoveFactor = 1
+
+windowDimension : (Int,Int)
 windowDimension = (600,400)
 
 type State
@@ -150,7 +153,7 @@ renderMessage (w,h) message =
 
 
 draw : (Int, Int) -> Game -> Element
-draw (w,h) (state,char,zombies,walls,noise,seed) = 
+draw (w,h) (state,char,zombies,walls,noise,seed) =
   case state of
     Start  -> renderMessage (w,h) "Please press space to start the game!"
     Move   -> collage w h
@@ -208,6 +211,8 @@ directionHelper userInput =
       ( 1, 0) -> East
       ( 0,-1) -> South
       ( 0, 1) -> North
+      -- why is this necessary?
+      ( _, _) -> North
 
 
 moveCharacter : { x:Int, y:Int } -> Player -> Player
@@ -222,19 +227,30 @@ moveCharacter userInput player =
     , direction = newDirection }
 
 
-idleZombieMove : Zombie -> Player -> List NoiseGenerator -> Zombie
-idleZombieMove zombie target noise = zombie
+idleHelper : (Int,Int) -> Direction -> (Int,Int)
+idleHelper (posX,posY) heading =
+  case heading of
+    West  -> ( posX - zombieMoveFactor, posY )
+    East  -> ( posX + zombieMoveFactor, posY )
+    North -> ( posX, posY + zombieMoveFactor )
+    South -> ( posX, posY - zombieMoveFactor )
+
+idleZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
+idleZombieMove zombie target noise heading =
+  let newPos = idleHelper zombie.position heading
+  in
+    { zombie | position <- newPos, direction <- heading }
 
 
-aggressiveZombieMove : Zombie -> Player -> List NoiseGenerator -> Zombie
-aggressiveZombieMove zombie target noise = zombie
+aggressiveZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
+aggressiveZombieMove zombie target noise heading = zombie
 
 
-huntingZombieMove : Zombie -> Player -> List NoiseGenerator -> Zombie
-huntingZombieMove zombie target noise = zombie
+huntingZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
+huntingZombieMove zombie target noise heading = zombie
 
 
-moveZombie : Zombie -> Player -> List NoiseGenerator -> Zombie
+moveZombie : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
 moveZombie zombie =
   case zombie.state of
     Idle       -> idleZombieMove zombie
@@ -242,9 +258,10 @@ moveZombie zombie =
     Hunting    -> huntingZombieMove zombie
 
 
-moveZombies : Player -> List NoiseGenerator -> List Zombie -> List Zombie
-moveZombies player noise zombies =
-  List.map (\zombie -> moveZombie zombie player noise) zombies
+moveZombies : Player -> List NoiseGenerator -> List Direction -> List Zombie -> List Zombie
+moveZombies player noise headings zombies =
+  List.map ( \(zombie, heading) -> moveZombie zombie player noise heading)
+  <| List.map2 (,)  zombies headings
 
 
 isNearHelper : Position -> List NoiseGenerator -> Bool
@@ -262,25 +279,63 @@ placeNoiseGenerator player noise =
   else noise
 
 
+randomHeading : Generator Int
+randomHeading = Random.int 0 3
+
+
+randomChangeDir : Generator Int
+randomChangeDir = Random.int 0 9
+
+
+randomHeadings : Int -> Generator (List Int)
+randomHeadings count = Random.list count randomHeading
+
+randomDirections : Int -> Generator (List Int)
+randomDirections count = Random.list count randomChangeDir
+
+
+headingHelper : (Int,Int,Zombie) -> Direction
+headingHelper (randNum, randChange, zombie) =
+  if randChange == 0
+  then
+    case randNum of
+      0 -> North
+      1 -> East
+      2 -> South
+      3 -> West
+  else
+    zombie.direction
+
+
+createHeadings : Seed -> List Zombie -> (Seed,List Direction)
+createHeadings seed zombies =
+  let (randList, listSeed) = Random.generate (List.length zombies |> randomHeadings) seed
+      (randChangeDir, dirSeed) = Random.generate (List.length zombies |> randomDirections) listSeed
+  in
+    ( dirSeed, List.map headingHelper <| List.map3 (,,) randList randChangeDir zombies )
+
+
+
 update : ({x:Int, y:Int},Bool) -> Game -> Game
 update userInput game =
   let (state, player, zombies, walls, noise, seed) = game
       (arrows, space) = userInput
+      (nextSeed, headings) = createHeadings seed zombies
   in
     case state of
       Start  ->
         if space
-        then (Move, player, zombies, walls, noise, seed)
+        then (Move, player, zombies, walls, noise, nextSeed)
         else game
       Move   ->
         ( winOrLose player zombies
         , moveCharacter arrows player
-        , moveZombies player noise zombies
+        , moveZombies player noise headings zombies
         , walls
         , if space
           then placeNoiseGenerator player noise
           else noise
-        , seed
+        , nextSeed
         )
       -- no transition to end
       Win    ->
