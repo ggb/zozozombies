@@ -42,10 +42,18 @@ type alias Zombie =
     , state:ZombieState
     }
 
+type alias Wall =
+    { x1:Int
+    , y1:Int
+    , x2:Int
+    , y2:Int
+    }
+
 type alias Game =
     ( State
     , Player
     , List Zombie
+    , List Wall
     )
 
 initialGame : Game
@@ -57,6 +65,7 @@ initialGame =
       , { position=(100,0), state=Idle }
       , { position=(250,50), state=Idle }
       ]
+    , []
     )
 
 
@@ -97,7 +106,7 @@ renderPlayground (w, h) =
 
 
 draw : (Int, Int) -> Game -> Element
-draw (w,h) (state,char,zombies) =
+draw (w,h) (state,char,zombies,walls) =
   collage w h
     ( renderPlayground (w,h) :: ( renderPlayer char :: renderZombies zombies ))
 
@@ -108,32 +117,35 @@ Controller and Update
 
 -}
 
-
+{-
 toSoundHelper (state,pc,npc) =
     "sampleSound"
 
 port handleSound : Signal String
 port handleSound =
     Signal.map toSoundHelper gameState
+-}
 
-
-moveCharacter player userInput =
+moveCharacter : { a | x : number, y : number } -> Player -> Player
+moveCharacter userInput player =
   let (xPos,yPos) = player.position
       newPos = ( xPos + userInput.x * moveFactor, yPos + userInput.y * moveFactor )
   in
     { position=newPos, noiseMaker=player.noiseMaker}
 
 
-update userInput (state, player, zombies) = 
+update : { a | x : number, y : number } -> Game -> Game
+update userInput (state, player, zombies, walls) = 
     case state of
-      Start -> (Move, player, zombies)
-      Move  -> (Move, (moveCharacter player userInput), zombies)
+      Start -> (Move, player, zombies, walls)
+      Move  -> (Move, (moveCharacter userInput player), zombies, walls)
       -- no transition to end
-      End   -> (End, player, zombies)
+      End   -> (End, player, zombies, walls)
 
 
 -- Keyboard.wasd
 --  ({x=0, y=0},{x=0, y=0}) (Signal.map2 (,) Keyboard.wasd Keyboard.arrows)
+gameState : Signal Game
 gameState = Signal.foldp update initialGame
             (Signal.sampleOn (Time.fps 60) Keyboard.arrows)
 
