@@ -32,7 +32,7 @@ type alias Position = ( Int, Int )
 type alias Player =
     { position:Position
     , target:Position
-    , noiseMaker:Int
+    , noiseGeneratorCount:Int
     }
 
 type ZombieState
@@ -68,7 +68,7 @@ type alias Game =
 initialGame : Game
 initialGame =
     ( Start
-    , { position=(-200,0), target=(200,0), noiseMaker=3 }
+    , { position=(-200,0), target=(200,0), noiseGeneratorCount=3 }
     , [ { position=(100,100), target=(0,0), state=Idle }
       , { position=(100,-100), target=(0,0), state=Idle }
       , { position=(100,0), target=(0,0), state=Idle }
@@ -107,8 +107,22 @@ renderSingleZombie zombie =
 
 
 renderZombies : List Zombie -> List Form
-renderZombies zombies =
-  List.map renderSingleZombie zombies
+renderZombies =
+  List.map renderSingleZombie
+
+
+renderNoiseGenerator : NoiseGenerator -> Form
+renderNoiseGenerator noise =
+  let (xPos,yPos) = noise.position
+  in
+    rect 15 15
+      |> filled Color.yellow
+      |> move ((toFloat xPos), (toFloat yPos))
+
+
+renderNoiseGenerators : List NoiseGenerator -> List Form
+renderNoiseGenerators =
+  List.map renderNoiseGenerator
 
 
 renderPlayground : (Int, Int) -> Form
@@ -128,11 +142,12 @@ renderMessage (w,h) message =
 
 
 draw : (Int, Int) -> Game -> Element
-draw (w,h) (state,char,zombies,walls,noise) =
+draw (w,h) (state,char,zombies,walls,noise) = 
   case state of
     Start  -> renderMessage (w,h) "Please press space to start the game!"
     Move   -> collage w h
-              (( renderPlayground (w,h)) :: ( renderPlayer char) ++ (renderZombies zombies ))
+              (( renderPlayground (w,h))
+               :: (renderNoiseGenerators noise) ++ (renderPlayer char) ++ (renderZombies zombies))
     Defeat -> renderMessage (w,h) "The zombies enjoyed your delicious brain..."
     Win    -> renderMessage (w,h) "Well done, survivor!"
 
@@ -181,7 +196,7 @@ moveCharacter userInput player =
   let (xPos,yPos) = player.position
       newPos = ( xPos + userInput.x * moveFactor, yPos + userInput.y * moveFactor )
   in
-    { position=newPos, noiseMaker=player.noiseMaker, target=player.target}
+    { position=newPos, noiseGeneratorCount=player.noiseGeneratorCount, target=player.target}
 
 
 idleZombieMove target zombie = zombie
@@ -206,26 +221,56 @@ moveZombies player zombies =
   List.map (moveZombie player) zombies
 
 
-update : { a | x : number, y : number } -> Game -> Game
-update userInput (state, player, zombies, walls, noise) =
+isNearHelper playerPos noise =
+  List.any
+    (\noise -> euclidianDistance playerPos noise.position < 30)
+    -- this is not solved  very elegant...
+    ( { position=(-200,0)}:: noise )
+
+
+placeNoiseGenerator : Player -> List NoiseGenerator -> List NoiseGenerator
+placeNoiseGenerator player noise =
+  if (player.noiseGeneratorCount > List.length noise) && not (isNearHelper player.position noise)
+  then { position=player.position  } :: noise
+  else noise
+
+
+-- update : ({x:Int, y:Int},Bool) -> Game -> Game
+update userInput game =
+  let (state, player, zombies, walls, noise) = game
+      (arrows, space) = userInput
+  in
     case state of
-      Start  -> (Move, player, zombies, walls, noise)
+      Start  ->
+        if space
+        then (Move, player, zombies, walls, noise)
+        else game
       Move   ->
         ( winOrLose player zombies
-        , moveCharacter userInput player
+        , moveCharacter arrows player
         , moveZombies player zombies
         , walls
-        , noise )
+        , if space
+          then placeNoiseGenerator player noise
+          else noise
+        )
       -- no transition to end
-      Win    -> (Win, player, zombies, walls, noise)
-      Defeat -> (Defeat, player, zombies, walls, noise)
+      Win    ->
+        if space
+        then initialGame
+        else game
+      Defeat ->
+        if space
+        then initialGame
+        else game
 
 
 -- Keyboard.wasd
 --  ({x=0, y=0},{x=0, y=0}) (Signal.map2 (,) Keyboard.wasd Keyboard.arrows)
 gameState : Signal Game
 gameState = Signal.foldp update initialGame
-            (Signal.sampleOn (Time.fps 60) Keyboard.arrows)
+            (Signal.map2 (,)
+                     (Signal.sampleOn (Time.fps 60) Keyboard.arrows) Keyboard.space)
 
 
 main : Signal Element
