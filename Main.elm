@@ -108,6 +108,7 @@ renderPlayer player =
       |> move ((toFloat targetX), (toFloat targetY))
     ]
 
+
 renderSingleZombie : Zombie -> Form
 renderSingleZombie zombie =
   let (xPos,yPos) = zombie.position
@@ -164,7 +165,7 @@ draw (w,h) (state,char,zombies,walls,noise,seed) =
 
 
 {-
-
+ 
 Controller and Update
 
 -}
@@ -221,33 +222,66 @@ moveCharacter userInput player =
       newPos = ( xPos + userInput.x * moveFactor, yPos + userInput.y * moveFactor )
       newDirection = directionHelper userInput
   in
-    { position = newPos
-    , noiseGeneratorCount = player.noiseGeneratorCount
-    , target = player.target
-    , direction = newDirection }
+    { player | position <- newPos, direction <- newDirection }
 
 
-idleHelper : (Int,Int) -> Direction -> (Int,Int)
-idleHelper (posX,posY) heading =
+updateZombieState : Zombie -> Player -> List NoiseGenerator -> ZombieState
+updateZombieState zombie player noise =
+  let zPos = zombie.position
+      pPos = player.position
+      distance = euclidianDistance zPos pPos
+  in
+    if | distance < 100  -> Hunting
+       | distance < 200 -> Aggressive
+       | otherwise      -> Idle
+
+
+determineDirection : Zombie -> Position -> Direction
+determineDirection zombie object =
+  let (zX, zY) = zombie.position
+      (oX, oY) = object
+      ( x,  y) = (oX - zX, oY - zY)
+      (absX, absY) = (abs x, abs y)
+  in
+    if | absX >= absY && x <  0 -> West
+       | absX >= absY && x >= 0 -> East
+       | absX <  absY && x <  0 -> South
+       | absX <  absY && x >= 0 -> North
+
+
+zombieMoveHelper : (Int,Int) -> Int -> Direction -> (Int,Int)
+zombieMoveHelper (posX,posY) mFactor heading =
   case heading of
-    West  -> ( posX - zombieMoveFactor, posY )
-    East  -> ( posX + zombieMoveFactor, posY )
-    North -> ( posX, posY + zombieMoveFactor )
-    South -> ( posX, posY - zombieMoveFactor )
+    West  -> ( posX - mFactor, posY )
+    East  -> ( posX + mFactor, posY )
+    North -> ( posX, posY + mFactor )
+    South -> ( posX, posY - mFactor )
+
 
 idleZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
 idleZombieMove zombie target noise heading =
-  let newPos = idleHelper zombie.position heading
+  let newPos   = zombieMoveHelper zombie.position zombieMoveFactor heading
+      newState = updateZombieState zombie target noise
   in
-    { zombie | position <- newPos, direction <- heading }
+    { zombie | position <- newPos, direction <- heading, state <- newState }
 
 
 aggressiveZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
-aggressiveZombieMove zombie target noise heading = zombie
+aggressiveZombieMove zombie target noise heading =
+  let newPos   = zombieMoveHelper zombie.position zombieMoveFactor
+                 <| determineDirection zombie target.position
+      newState = updateZombieState zombie target noise
+  in
+    { zombie | position <- newPos, state <- newState }
 
 
 huntingZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
-huntingZombieMove zombie target noise heading = zombie
+huntingZombieMove zombie target noise heading =
+  let newPos  = zombieMoveHelper zombie.position 3
+                <| determineDirection zombie target.position
+      newState = updateZombieState zombie target noise
+  in
+    { zombie | position <- newPos, state <- newState }
 
 
 moveZombie : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
@@ -290,6 +324,7 @@ randomChangeDir = Random.int 0 9
 randomHeadings : Int -> Generator (List Int)
 randomHeadings count = Random.list count randomHeading
 
+
 randomDirections : Int -> Generator (List Int)
 randomDirections count = Random.list count randomChangeDir
 
@@ -313,7 +348,6 @@ createHeadings seed zombies =
       (randChangeDir, dirSeed) = Random.generate (List.length zombies |> randomDirections) listSeed
   in
     ( dirSeed, List.map headingHelper <| List.map3 (,,) randList randChangeDir zombies )
-
 
 
 update : ({x:Int, y:Int},Bool) -> Game -> Game
@@ -348,8 +382,6 @@ update userInput game =
         else game
 
 
--- Keyboard.wasd
---  ({x=0, y=0},{x=0, y=0}) (Signal.map2 (,) Keyboard.wasd Keyboard.arrows)
 gameState : Signal Game
 gameState = Signal.foldp update initialGame
             (Signal.map2 (,)
@@ -358,6 +390,5 @@ gameState = Signal.foldp update initialGame
 
 main : Signal Element
 main = Signal.map2 draw (Signal.constant windowDimension) gameState
--- main = Signal.map2 draw (Signal.constant windowDimension) gameState
 
 
