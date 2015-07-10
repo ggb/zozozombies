@@ -29,10 +29,15 @@ type State
 
 type alias Position = ( Int, Int )
 
+
+type Direction = North | East | South | West
+
+
 type alias Player =
     { position:Position
     , target:Position
     , noiseGeneratorCount:Int
+    , direction:Direction
     }
 
 type ZombieState
@@ -44,6 +49,7 @@ type alias Zombie =
     { position:Position
     , target:Position
     , state:ZombieState
+    , direction:Direction
     }
 
 type alias Wall =
@@ -68,11 +74,11 @@ type alias Game =
 initialGame : Game
 initialGame =
     ( Start
-    , { position=(-200,0), target=(200,0), noiseGeneratorCount=3 }
-    , [ { position=(100,100), target=(0,0), state=Idle }
-      , { position=(100,-100), target=(0,0), state=Idle }
-      , { position=(100,0), target=(0,0), state=Idle }
-      , { position=(250,50), target=(0,0), state=Idle }
+    , { position=(-200,0), target=(200,0), noiseGeneratorCount=3, direction=East }
+    , [ { position=(100,100), target=(0,0), state=Idle, direction=West }
+      , { position=(100,-100), target=(0,0), state=Idle, direction=West }
+      , { position=(100,0), target=(0,0), state=Idle, direction=North }
+      , { position=(250,50), target=(0,0), state=Idle, direction=South }
       ]
     , []
     , []
@@ -191,41 +197,60 @@ winOrLose player zombies =
     else Move
 
 
-moveCharacter : { a | x : number, y : number } -> Player -> Player
+directionHelper : { x:Int, y:Int } -> Direction
+directionHelper userInput =
+  let heading = ( userInput.x, userInput.y )
+  in
+    case heading of
+      (-1, 0) -> West
+      ( 1, 0) -> East
+      ( 0,-1) -> South
+      ( 0, 1) -> North
+
+
+moveCharacter : { x:Int, y:Int } -> Player -> Player
 moveCharacter userInput player =
   let (xPos,yPos) = player.position
       newPos = ( xPos + userInput.x * moveFactor, yPos + userInput.y * moveFactor )
+      newDirection = directionHelper userInput
   in
-    { position=newPos, noiseGeneratorCount=player.noiseGeneratorCount, target=player.target}
+    { position = newPos
+    , noiseGeneratorCount = player.noiseGeneratorCount
+    , target = player.target
+    , direction = newDirection }
 
 
-idleZombieMove target zombie = zombie
+idleZombieMove : Zombie -> Player -> List NoiseGenerator -> Zombie
+idleZombieMove zombie target noise = zombie
 
 
-aggressiveZombieMove target zombie = zombie
+aggressiveZombieMove : Zombie -> Player -> List NoiseGenerator -> Zombie
+aggressiveZombieMove zombie target noise = zombie
 
 
-huntingZombieMove target zombie = zombie
+huntingZombieMove : Zombie -> Player -> List NoiseGenerator -> Zombie
+huntingZombieMove zombie target noise = zombie
 
 
-moveZombie : Player -> Zombie -> Zombie
-moveZombie player zombie =
+moveZombie : Zombie -> Player -> List NoiseGenerator -> Zombie
+moveZombie zombie =
   case zombie.state of
-    Idle       -> idleZombieMove player zombie
-    Aggressive -> aggressiveZombieMove player zombie
-    Hunting    -> huntingZombieMove player zombie
+    Idle       -> idleZombieMove zombie
+    Aggressive -> aggressiveZombieMove zombie
+    Hunting    -> huntingZombieMove zombie
 
 
-moveZombies : Player -> List Zombie -> List Zombie
-moveZombies player zombies =
-  List.map (moveZombie player) zombies
+moveZombies : Player -> List NoiseGenerator -> List Zombie -> List Zombie
+moveZombies player noise zombies =
+  List.map (\zombie -> moveZombie zombie player noise) zombies
 
 
+isNearHelper : Position -> List NoiseGenerator -> Bool
 isNearHelper playerPos noise =
   List.any
     (\noise -> euclidianDistance playerPos noise.position < 30)
     -- this is not solved  very elegant...
-    ( { position=(-200,0)}:: noise )
+    ( { position=(-200,0) } :: noise )
 
 
 placeNoiseGenerator : Player -> List NoiseGenerator -> List NoiseGenerator
@@ -235,7 +260,7 @@ placeNoiseGenerator player noise =
   else noise
 
 
--- update : ({x:Int, y:Int},Bool) -> Game -> Game
+update : ({x:Int, y:Int},Bool) -> Game -> Game
 update userInput game =
   let (state, player, zombies, walls, noise) = game
       (arrows, space) = userInput
@@ -248,7 +273,7 @@ update userInput game =
       Move   ->
         ( winOrLose player zombies
         , moveCharacter arrows player
-        , moveZombies player zombies
+        , moveZombies player noise zombies
         , walls
         , if space
           then placeNoiseGenerator player noise
