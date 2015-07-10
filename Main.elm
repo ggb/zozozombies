@@ -5,6 +5,7 @@ import Color
 import Signal
 -- import Window
 import Keyboard
+import Text
 import Graphics.Collage exposing (..)
 import Graphics.Element exposing (..)
 
@@ -23,12 +24,14 @@ windowDimension = (600,400)
 type State
     = Start
     | Move
-    | End
+    | Win
+    | Defeat
 
 type alias Position = ( Int, Int )
 
 type alias Player =
     { position:Position
+    , target:Position
     , noiseMaker:Int
     }
 
@@ -39,6 +42,7 @@ type ZombieState
 
 type alias Zombie =
     { position:Position
+    , target:Position
     , state:ZombieState
     }
 
@@ -59,11 +63,11 @@ type alias Game =
 initialGame : Game
 initialGame =
     ( Start
-    , { position=(-200,0), noiseMaker=3 }
-    , [ { position=(100,100), state=Idle }
-      , { position=(100,-100), state=Idle }
-      , { position=(100,0), state=Idle }
-      , { position=(250,50), state=Idle }
+    , { position=(-200,0), target=(200,0), noiseMaker=3 }
+    , [ { position=(100,100), target=(0,0), state=Idle }
+      , { position=(100,-100), target=(0,0), state=Idle }
+      , { position=(100,0), target=(0,0), state=Idle }
+      , { position=(250,50), target=(0,0), state=Idle }
       ]
     , []
     )
@@ -74,14 +78,18 @@ initialGame =
 View
 
 -}
-renderPlayer : Player -> Form
+renderPlayer : Player -> List Form
 renderPlayer player =
-  let (xPos,yPos) = player.position
+  let (playerX,playerY) = player.position
+      (targetX,targetY) = player.target
   in
-    rect 25 25
+    [ rect 25 25
       |> filled Color.brown
-      |> move ((toFloat xPos), (toFloat yPos))
-
+      |> move ((toFloat playerX), (toFloat playerY))
+    , rect 25 25
+      |> filled Color.green
+      |> move ((toFloat targetX), (toFloat targetY))
+    ]
 
 renderSingleZombie : Zombie -> Form
 renderSingleZombie zombie =
@@ -105,10 +113,22 @@ renderPlayground (w, h) =
     rect w' h' |> filled Color.grey
 
 
+renderMessage : (Int,Int) -> String -> Element
+renderMessage (w,h) message =
+  Text.fromString message
+  |> centered
+  |> size w h
+  |> color Color.grey
+
+
 draw : (Int, Int) -> Game -> Element
 draw (w,h) (state,char,zombies,walls) =
-  collage w h
-    ( renderPlayground (w,h) :: ( renderPlayer char :: renderZombies zombies ))
+  case state of
+    Start  -> renderMessage (w,h) "Please press space to start the game!"
+    Move   -> collage w h
+              (( renderPlayground (w,h)) :: ( renderPlayer char) ++ (renderZombies zombies ))
+    Defeat -> renderMessage (w,h) "The zombies enjoyed your delicious brain..."
+    Win    -> renderMessage (w,h) "Well done, survivor!"
 
 
 {-
@@ -125,22 +145,51 @@ port handleSound : Signal String
 port handleSound =
     Signal.map toSoundHelper gameState
 -}
+euclidianDistance : Position -> Position -> Float
+euclidianDistance (p1, p2) (q1, q2) =
+  (q1 - p1)^2 + (q2 - p2)^2 |> toFloat |> sqrt
+
+
+winSituation : Player -> Bool
+winSituation player =
+  ( euclidianDistance player.position player.target ) < 20
+
+
+loseSituation : Player -> List Zombie -> Bool
+loseSituation player zombies =
+  List.any (\zombie -> euclidianDistance player.position zombie.position < 20) zombies
+
+
+winOrLose : Player -> List Zombie -> State
+winOrLose player zombies =
+  if winSituation player
+  then Win
+  else
+    if loseSituation player zombies
+    then Defeat
+    else Move
+
 
 moveCharacter : { a | x : number, y : number } -> Player -> Player
 moveCharacter userInput player =
   let (xPos,yPos) = player.position
       newPos = ( xPos + userInput.x * moveFactor, yPos + userInput.y * moveFactor )
   in
-    { position=newPos, noiseMaker=player.noiseMaker}
+    { position=newPos, noiseMaker=player.noiseMaker, target=player.target}
 
 
 update : { a | x : number, y : number } -> Game -> Game
-update userInput (state, player, zombies, walls) = 
+update userInput (state, player, zombies, walls) =
     case state of
-      Start -> (Move, player, zombies, walls)
-      Move  -> (Move, (moveCharacter userInput player), zombies, walls)
+      Start  -> (Move, player, zombies, walls)
+      Move   ->
+        ( winOrLose player zombies
+        , moveCharacter userInput player
+        , zombies
+        , walls )
       -- no transition to end
-      End   -> (End, player, zombies, walls)
+      Win    -> (Win, player, zombies, walls)
+      Defeat -> (Defeat, player, zombies, walls)
 
 
 -- Keyboard.wasd
