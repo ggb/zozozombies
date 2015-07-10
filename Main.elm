@@ -53,11 +53,16 @@ type alias Wall =
     , y2:Int
     }
 
+type alias NoiseGenerator =
+    { position:Position
+    }
+
 type alias Game =
     ( State
     , Player
     , List Zombie
     , List Wall
+    , List NoiseGenerator
     )
 
 initialGame : Game
@@ -69,6 +74,7 @@ initialGame =
       , { position=(100,0), target=(0,0), state=Idle }
       , { position=(250,50), target=(0,0), state=Idle }
       ]
+    , []
     , []
     )
 
@@ -122,7 +128,7 @@ renderMessage (w,h) message =
 
 
 draw : (Int, Int) -> Game -> Element
-draw (w,h) (state,char,zombies,walls) =
+draw (w,h) (state,char,zombies,walls,noise) =
   case state of
     Start  -> renderMessage (w,h) "Please press space to start the game!"
     Move   -> collage w h
@@ -178,18 +184,41 @@ moveCharacter userInput player =
     { position=newPos, noiseMaker=player.noiseMaker, target=player.target}
 
 
+idleZombieMove target zombie = zombie
+
+
+aggressiveZombieMove target zombie = zombie
+
+
+huntingZombieMove target zombie = zombie
+
+
+moveZombie : Player -> Zombie -> Zombie
+moveZombie player zombie =
+  case zombie.state of
+    Idle       -> idleZombieMove player zombie
+    Aggressive -> aggressiveZombieMove player zombie
+    Hunting    -> huntingZombieMove player zombie
+
+
+moveZombies : Player -> List Zombie -> List Zombie
+moveZombies player zombies =
+  List.map (moveZombie player) zombies
+
+
 update : { a | x : number, y : number } -> Game -> Game
-update userInput (state, player, zombies, walls) =
+update userInput (state, player, zombies, walls, noise) =
     case state of
-      Start  -> (Move, player, zombies, walls)
+      Start  -> (Move, player, zombies, walls, noise)
       Move   ->
         ( winOrLose player zombies
         , moveCharacter userInput player
-        , zombies
-        , walls )
+        , moveZombies player zombies
+        , walls
+        , noise )
       -- no transition to end
-      Win    -> (Win, player, zombies, walls)
-      Defeat -> (Defeat, player, zombies, walls)
+      Win    -> (Win, player, zombies, walls, noise)
+      Defeat -> (Defeat, player, zombies, walls, noise)
 
 
 -- Keyboard.wasd
