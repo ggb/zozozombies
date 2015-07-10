@@ -102,32 +102,39 @@ initialGame =
 View
 
 -}
+renderImage : Position -> Direction -> Int -> String -> Form
+renderImage position direction imgNumber name =
+  let (xPos,yPos) = position
+      path = "res/img/" ++ name ++ (toString <| imgNumber + 1) ++ ".png"
+      img = toForm (image 25 25 path) |> move ((toFloat xPos), (toFloat yPos))
+  in
+    case direction of
+      North -> img
+      West  -> rotate (degrees 90) img
+      South -> rotate (degrees 180) img
+      East  -> rotate (degrees 270) img
+
+
+renderZombieImage : Zombie -> Form
+renderZombieImage zombie =
+  let name = if zombie.zombieType == Brainy then "zombi1_" else "zombi2_"
+  in
+    renderImage zombie.position zombie.direction zombie.imgNumber name
+
+
 renderPlayer : Player -> List Form
 renderPlayer player =
-  let (playerX,playerY) = player.position
-      (targetX,targetY) = player.target
+  let (targetX,targetY) = player.target
   in
-    [ rect 25 25
-      |> filled Color.brown
-      |> move ((toFloat playerX), (toFloat playerY))
+    [ renderImage player.position player.direction player.imgNumber "erdling_"
     , rect 25 25
       |> filled Color.green
       |> move ((toFloat targetX), (toFloat targetY))
     ]
 
-
-renderSingleZombie : Zombie -> Form
-renderSingleZombie zombie =
-  let (xPos,yPos) = zombie.position
-  in
-    rect 20 20
-      |> filled Color.red
-      |> move ((toFloat xPos), (toFloat yPos))
-
-
 renderZombies : List Zombie -> List Form
 renderZombies =
-  List.map renderSingleZombie
+  List.map renderZombieImage
 
 
 renderNoiseGenerator : NoiseGenerator -> Form
@@ -210,8 +217,8 @@ winOrLose player zombies =
     else Move
 
 
-directionHelper : { x:Int, y:Int } -> Direction
-directionHelper userInput =
+directionHelper : { x:Int, y:Int } -> Direction -> Direction
+directionHelper userInput oldDirection =
   let heading = ( userInput.x, userInput.y )
   in
     case heading of
@@ -220,19 +227,21 @@ directionHelper userInput =
       ( 0,-1) -> South
       ( 0, 1) -> North
       -- why is this necessary?
-      ( _, _) -> North
+      ( _, _) -> oldDirection
 
 
 moveCharacter : { x:Int, y:Int } -> Player -> Player
 moveCharacter userInput player =
   let (xPos,yPos) = player.position
       newPos = ( xPos + userInput.x * moveFactor, yPos + userInput.y * moveFactor )
-      newDirection = directionHelper userInput
+      newDirection = directionHelper userInput player.direction
       newImgNumber = (player.imgNumber + 1) % 6
   in
-    { player | position <- newPos
-             , direction <- newDirection
-             , imgNumber <- newImgNumber }
+    if userInput == { x=0, y=0 }
+    then player
+    else { player | position <- newPos
+                  , direction <- newDirection
+                  , imgNumber <- newImgNumber }
 
 
 updateZombieState : Zombie -> Player -> List NoiseGenerator -> ZombieState
@@ -282,26 +291,28 @@ idleZombieMove zombie target noise heading =
 
 aggressiveZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
 aggressiveZombieMove zombie target noise heading =
-  let newPos   = zombieMoveHelper zombie.position zombieMoveFactor
-                 <| determineDirection zombie target.position
+  let newDir = determineDirection zombie target.position
+      newPos  = zombieMoveHelper zombie.position zombieMoveFactor newDir
       newState = updateZombieState zombie target noise
       newImgNumber = (zombie.imgNumber + 1) % 6
   in
     { zombie | position  <- newPos
              , state     <- newState
-             , imgNumber <- newImgNumber }
+             , imgNumber <- newImgNumber
+             , direction <- newDir }
 
 
 huntingZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
 huntingZombieMove zombie target noise heading =
-  let newPos  = zombieMoveHelper zombie.position 3
-                <| determineDirection zombie target.position
+  let newDir = determineDirection zombie target.position
+      newPos = zombieMoveHelper zombie.position 3 newDir
       newState = updateZombieState zombie target noise
       newImgNumber = (zombie.imgNumber + 1) % 6
   in
     { zombie | position  <- newPos
              , state     <- newState
-             , imgNumber <- newImgNumber }
+             , imgNumber <- newImgNumber
+             , direction <- newDir }
 
 
 moveZombie : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
