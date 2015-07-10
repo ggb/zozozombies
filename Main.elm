@@ -3,7 +3,7 @@ module Game where
 import Time
 import Color
 import Signal
-import Window
+-- import Window
 import Keyboard
 import Graphics.Collage exposing (..)
 import Graphics.Element exposing (..)
@@ -14,7 +14,10 @@ Model and Constants
 
 -}
 
+moveFactor : number
 moveFactor = 3
+
+windowDimension : (number, number')
 windowDimension = (600,400)
 
 type State
@@ -22,24 +25,34 @@ type State
     | Move
     | End
 
-type alias Character =
-    { xPos:Int
-    , yPos:Int
+type alias Position = ( Int, Int )
+
+type alias Player =
+    { position:Position
+    , noiseMaker:Int
     }
 
-initialChara =
-    { xPos=0
-    , yPos=0
+type ZombieState
+    = Idle
+    | Aggressive
+    | Hunting
+
+type alias Zombie =
+    { position:Position
+    , state:ZombieState
     }
 
 type alias Game =
     ( State
-    , Character
+    , Player
+    , List Zombie
     )
 
+initialGame : Game
 initialGame =
     ( Start
-    , initialChara
+    , { position=(0,0), noiseMaker=3 }
+    , []
     )
 
 
@@ -49,12 +62,14 @@ View
 
 -}
 
-draw (w,h) (state,char) =
+draw (w,h) (state,char,zombies) =
+  let (xPos,yPos) = char.position
+  in
     collage w h
-    [ rect (toFloat w) (toFloat h) |> filled Color.blue
-    , rect 50 50
-        |> filled Color.green
-        |> move ((toFloat char.xPos), (toFloat char.yPos))
+    [ rect (toFloat w) (toFloat h) |> filled Color.grey
+    , rect 25 25
+        |> filled Color.brown
+        |> move ((toFloat xPos), (toFloat yPos))
     ]
 
 
@@ -65,15 +80,8 @@ Controller and Update
 -}
 
 
-toSoundHelper (state,rest) =
-    if rest.xPos > 0 then "rightSound" else "leftSound"
-    {-
-    case state of
-      Start -> "startSound"
-      Move  -> "moveSound"
-      End   -> "pauseSound"
-    -}
-
+toSoundHelper (state,pc,npc) =
+    "sampleSound"
 
 port handleSound : Signal String
 port handleSound =
@@ -81,17 +89,18 @@ port handleSound =
 
 
 moveCharacter player userInput =
-    { xPos = player.xPos + userInput.x * moveFactor
-    , yPos = player.yPos + userInput.y * moveFactor
-    }
+  let (xPos,yPos) = player.position
+      newPos = ( xPos + userInput.x * moveFactor, yPos + userInput.y * moveFactor )
+  in
+    { position=newPos, noiseMaker=player.noiseMaker}
 
 
-update userInput (state, player) = 
+update userInput (state, player, zombies) = 
     case state of
-      Start -> (Move, player)
-      Move  -> (Move, (moveCharacter player userInput))
+      Start -> (Move, player, zombies)
+      Move  -> (Move, (moveCharacter player userInput), zombies)
       -- no transition to end
-      End   -> (End, player)
+      End   -> (End, player, zombies)
 
 
 -- Keyboard.wasd
@@ -101,7 +110,7 @@ gameState = Signal.foldp update initialGame
 
 
 main : Signal Element
-main = Signal.map2 draw Window.dimensions gameState
+main = Signal.map2 draw (Signal.constant windowDimension) gameState
 -- main = Signal.map2 draw (Signal.constant windowDimension) gameState
 
 
