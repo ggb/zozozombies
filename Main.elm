@@ -3,7 +3,7 @@ module Game where
 import Time
 import Color
 import Signal
--- import Window
+import Random exposing (Seed)
 import Keyboard
 import Text
 import Graphics.Collage exposing (..)
@@ -69,6 +69,7 @@ type alias Game =
     , List Zombie
     , List Wall
     , List NoiseGenerator
+    , Seed
     )
 
 initialGame : Game
@@ -82,6 +83,7 @@ initialGame =
       ]
     , []
     , []
+    , Random.initialSeed 42
     )
 
 
@@ -148,7 +150,7 @@ renderMessage (w,h) message =
 
 
 draw : (Int, Int) -> Game -> Element
-draw (w,h) (state,char,zombies,walls,noise) = 
+draw (w,h) (state,char,zombies,walls,noise,seed) = 
   case state of
     Start  -> renderMessage (w,h) "Please press space to start the game!"
     Move   -> collage w h
@@ -262,13 +264,13 @@ placeNoiseGenerator player noise =
 
 update : ({x:Int, y:Int},Bool) -> Game -> Game
 update userInput game =
-  let (state, player, zombies, walls, noise) = game
+  let (state, player, zombies, walls, noise, seed) = game
       (arrows, space) = userInput
   in
     case state of
       Start  ->
         if space
-        then (Move, player, zombies, walls, noise)
+        then (Move, player, zombies, walls, noise, seed)
         else game
       Move   ->
         ( winOrLose player zombies
@@ -278,6 +280,7 @@ update userInput game =
         , if space
           then placeNoiseGenerator player noise
           else noise
+        , seed
         )
       -- no transition to end
       Win    ->
