@@ -51,8 +51,12 @@ type alias Game =
 initialGame : Game
 initialGame =
     ( Start
-    , { position=(0,0), noiseMaker=3 }
-    , []
+    , { position=(-200,0), noiseMaker=3 }
+    , [ { position=(100,100), state=Idle }
+      , { position=(100,-100), state=Idle }
+      , { position=(100,0), state=Idle }
+      , { position=(250,50), state=Idle }
+      ]
     )
 
 
@@ -61,16 +65,41 @@ initialGame =
 View
 
 -}
-
-draw (w,h) (state,char,zombies) =
-  let (xPos,yPos) = char.position
+renderPlayer : Player -> Form
+renderPlayer player =
+  let (xPos,yPos) = player.position
   in
-    collage w h
-    [ rect (toFloat w) (toFloat h) |> filled Color.grey
-    , rect 25 25
-        |> filled Color.brown
-        |> move ((toFloat xPos), (toFloat yPos))
-    ]
+    rect 25 25
+      |> filled Color.brown
+      |> move ((toFloat xPos), (toFloat yPos))
+
+
+renderSingleZombie : Zombie -> Form
+renderSingleZombie zombie =
+  let (xPos,yPos) = zombie.position
+  in
+    rect 20 20
+      |> filled Color.red
+      |> move ((toFloat xPos), (toFloat yPos))
+
+
+renderZombies : List Zombie -> List Form
+renderZombies zombies =
+  List.map renderSingleZombie zombies
+
+
+renderPlayground : (Int, Int) -> Form
+renderPlayground (w, h) =
+  let w' = toFloat w
+      h' = toFloat h
+  in
+    rect w' h' |> filled Color.grey
+
+
+draw : (Int, Int) -> Game -> Element
+draw (w,h) (state,char,zombies) =
+  collage w h
+    ( renderPlayground (w,h) :: ( renderPlayer char :: renderZombies zombies ))
 
 
 {-
