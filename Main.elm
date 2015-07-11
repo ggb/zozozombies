@@ -21,6 +21,9 @@ moveFactor = 3
 zombieMoveFactor : Int
 zombieMoveFactor = 1
 
+zombieFastMoveFactor : Int
+zombieFastMoveFactor = 3
+
 windowDimension : (Int,Int)
 windowDimension = (800,600)
 
@@ -103,7 +106,7 @@ initialGame =
       ]
     , [
         -- outer frame
-       { start=(405,-300), end=(405,300) }
+        { start=(405,-300), end=(405,300) }
       , { start=(-405,-300), end=(-405,300) }
       , { start=(-400,305), end=(400,305) }
       , { start=(-400,-305), end=(400,-305)}
@@ -223,15 +226,20 @@ Controller and Update
 
 -}
 toSoundHelper : Game -> String
-toSoundHelper (state,player,zombies,noise,walls,seed) =
+toSoundHelper (state,player,zombies,walls,noise,seed) =
    if | state == Move   -> "backgroundSound"
       | state == Defeat -> "defeat"
       | state == Win    -> "chainsaw"
-      | otherwise       -> ""
+      | otherwise       -> toString <| List.length noise
 
 port handleSound : Signal String
 port handleSound =
-    Signal.map toSoundHelper gameState
+  Signal.map toSoundHelper gameState
+
+
+port handleSirenSound : Signal String
+port handleSirenSound =
+  Signal.map (\x -> "sirene") Keyboard.space
 
 
 euclidianDistance : Position -> Position -> Float
@@ -365,7 +373,7 @@ moveZombie : Zombie -> List Zombie -> Player -> List NoiseGenerator -> Direction
 moveZombie zombie zombies player noise heading walls =
   let target = getTarget zombie <| ( player.position :: List.map (\ele -> ele.position) noise )
       speed = if zombie.state == Hunting
-              then 3
+              then zombieFastMoveFactor
               else zombieMoveFactor
       newDir = if zombie.state == Idle
                then heading

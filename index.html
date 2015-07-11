@@ -31,7 +31,8 @@
      var backgroundAudio = document.getElementById("audio_1");
 
      var event = "",
-         audio = null;
+         audio = null,
+         generator = 0;
      game.ports.handleSound.subscribe(function(val) {
          if(val != event) {
              event = val;
@@ -47,9 +48,25 @@
                  new Audio("res/sound/Zombie_Schrei.mp3").play();
              } else if(event === "chainsaw") {
                  new Audio("res/sound/chainsaw.mp3").play();
+             } else {
+                 generator = parseInt(val);
+                 console.log("parsedVal");
              }
          }
      });
+
+     var counter = 0;
+     game.ports.handleSirenSound.subscribe(function(val) {
+         console.log(counter);
+         counter++;
+         if(counter > 2 && generator > 0) {
+             console.log("counter is > 1", counter, "+++", generator);
+
+             new Audio("res/sound/Siren.mp3").play();
+         }
+     });
+
+
     </script>
   </body>
 </html>
