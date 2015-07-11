@@ -326,8 +326,8 @@ determineDirection zombie object =
   in
     if | absX >= absY && x <  0 -> West
        | absX >= absY && x >= 0 -> East
-       | absX <  absY && x <  0 -> South
-       | absX <  absY && x >= 0 -> North
+       | absX <  absY && y <  0 -> South
+       | absX <  absY && y >= 0 -> North
 
 
 zombieMoveHelper : (Int,Int) -> Int -> Direction -> (Int,Int)
