@@ -179,12 +179,7 @@ renderWalls =
 
 renderNoiseGenerator : NoiseGenerator -> Form
 renderNoiseGenerator noise =
-  let (xPos,yPos) = noise.position
-  in
-    rect 15 15
-      |> filled Color.yellow
-      |> move ((toFloat xPos), (toFloat yPos))
-
+  renderStaticImage noise.position (50,25) "tröte"
 
 renderNoiseGenerators : List NoiseGenerator -> List Form
 renderNoiseGenerators =
