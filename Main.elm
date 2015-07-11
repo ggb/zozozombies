@@ -225,14 +225,17 @@ Controller and Update
 
 -}
 
-{-
-toSoundHelper (state,pc,npc) =
-    "sampleSound"
+toSoundHelper : Game -> String
+toSoundHelper (state,player,zombies,noise,walls,seed) =
+   if | state == Move   -> "backgroundSound"
+      | state == Defeat -> "defeat"
+      | otherwise       -> ""
 
 port handleSound : Signal String
 port handleSound =
     Signal.map toSoundHelper gameState
--}
+
+
 euclidianDistance : Position -> Position -> Float
 euclidianDistance (p1, p2) (q1, q2) =
   (q1 - p1)^2 + (q2 - p2)^2 |> toFloat |> sqrt

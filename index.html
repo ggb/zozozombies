@@ -1,0 +1,49 @@
+<html>
+  <head>
+    <script type="text/javascript" src="elm.js"></script>
+
+    <style>
+
+     body {
+         padding:0;
+         margin:0;
+         font-family:Arial;
+     }
+
+    </style>
+
+  </head>
+  <body>
+    <div id="game_canvas" style="width:800px; height:600px;"></div>
+
+    <audio id="audio_1" preload loop>
+        <source src="res/sound/Zombie_Background.mp3">
+    </audio>
+
+    <script type="text/javascript">
+     var div = document.getElementById("game_canvas");
+     var game = Elm.embed(Elm.Game, div, {});
+     var backgroundAudio = document.getElementById("audio_1");
+
+     var event = "",
+         audio = null;
+     game.ports.handleSound.subscribe(function(val) {
+         if(val != event) {
+             event = val;
+
+             if(event === "backgroundSound") {
+                 audio = new Audio("res/sound/Zombie_Background.mp3");
+                 audio.addEventListener('ended', function() {
+                     this.currentTime = 0;
+                     this.play();
+                 }, false);
+                 audio.play();
+             } else if(event === "defeat") {
+                 audio = new Audio("res/sound/Zombie_Schrei.mp3").play();
+             }
+         }
+     });
+    </script>
+  </body>
+</html>
+
