@@ -204,9 +204,9 @@ draw (w,h) (state,char,zombies,walls,noise,seed) =
     Move   -> collage w h
               (( renderPlayground (w,h))
                :: (renderNoiseGenerators noise)
+               ++ (renderWalls walls)
                ++ (renderPlayer char)
-               ++ (renderZombies zombies)
-               ++ (renderWalls walls))
+               ++ (renderZombies zombies))
     Defeat -> renderMessage (w,h) "The zombies enjoyed your delicious brain..."
     Win    -> renderMessage (w,h) "Well done, survivor!"
 
@@ -331,58 +331,30 @@ zombieMoveHelper (posX,posY) mFactor heading =
     South -> ( posX, posY - mFactor )
 
 
-
-
-
-idleZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
-idleZombieMove zombie target noise heading =
-  let newPos   = zombieMoveHelper zombie.position zombieMoveFactor heading
-      newState = updateZombieState zombie target noise
+moveZombie : Zombie -> Player -> List NoiseGenerator -> Direction -> List Wall -> Zombie
+moveZombie zombie target noise heading walls =
+  let speed = if zombie.state == Hunting
+              then 3
+              else zombieMoveFactor
+      newDir = if zombie.state == Idle
+               then heading
+               else determineDirection zombie target.position
+      newPos = zombieMoveHelper zombie.position speed heading
+      collision = detectWallCollision newPos walls
+      newState = if collision
+                 then Idle
+                 else updateZombieState zombie target noise
       newImgNumber = (zombie.imgNumber + 1) % 6
   in
-    { zombie | position  <- newPos
-             , direction <- heading
-             , state     <- newState
-             , imgNumber <- newImgNumber}
+    { zombie | position  <- if collision then zombie.position else newPos
+    , direction <- heading
+    , state     <- newState
+    , imgNumber <- newImgNumber}
 
 
-aggressiveZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
-aggressiveZombieMove zombie target noise heading =
-  let newDir = determineDirection zombie target.position
-      newPos  = zombieMoveHelper zombie.position zombieMoveFactor newDir
-      newState = updateZombieState zombie target noise
-      newImgNumber = (zombie.imgNumber + 1) % 6
-  in
-    { zombie | position  <- newPos
-             , state     <- newState
-             , imgNumber <- newImgNumber
-             , direction <- newDir }
-
-
-huntingZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
-huntingZombieMove zombie target noise heading =
-  let newDir = determineDirection zombie target.position
-      newPos = zombieMoveHelper zombie.position 3 newDir
-      newState = updateZombieState zombie target noise
-      newImgNumber = (zombie.imgNumber + 1) % 6
-  in
-    { zombie | position  <- newPos
-             , state     <- newState
-             , imgNumber <- newImgNumber
-             , direction <- newDir }
-
-
-moveZombie : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
-moveZombie zombie =
-  case zombie.state of
-    Idle       -> idleZombieMove zombie
-    Aggressive -> aggressiveZombieMove zombie
-    Hunting    -> huntingZombieMove zombie
-
-
-moveZombies : Player -> List NoiseGenerator -> List Direction -> List Zombie -> List Zombie
-moveZombies player noise headings zombies =
-  List.map ( \(zombie, heading) -> moveZombie zombie player noise heading)
+moveZombies : Player -> List NoiseGenerator -> List Direction -> List Wall ->  List Zombie -> List Zombie
+moveZombies player noise headings walls  zombies =
+  List.map ( \(zombie, heading) -> moveZombie zombie player noise heading walls)
   <| List.map2 (,)  zombies headings
 
 
@@ -452,7 +424,7 @@ update userInput game =
       Move   ->
         ( winOrLose player zombies
         , moveCharacter arrows player walls
-        , moveZombies player noise headings zombies
+        , moveZombies player noise headings walls zombies
         , walls
         , if space
           then placeNoiseGenerator player noise
