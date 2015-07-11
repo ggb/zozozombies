@@ -22,7 +22,7 @@ zombieMoveFactor : Int
 zombieMoveFactor = 1
 
 windowDimension : (Int,Int)
-windowDimension = (600,400)
+windowDimension = (800,600)
 
 type State
     = Start
@@ -63,10 +63,8 @@ type alias Zombie =
     }
 
 type alias Wall =
-    { x1:Int
-    , y1:Int
-    , x2:Int
-    , y2:Int
+    { start:Position
+    , end:Position
     }
 
 type alias NoiseGenerator =
@@ -85,13 +83,26 @@ type alias Game =
 initialGame : Game
 initialGame =
     ( Start
-    , { position=(-200,0), target=(200,0), noiseGeneratorCount=3, direction=East, imgNumber=0 }
+    , { position=(-300,200), target=(250,-100), noiseGeneratorCount=3, direction=East, imgNumber=0 }
     , [ { position=(100,100), target=(0,0), state=Idle, direction=West, imgNumber=0, zombieType=Frankenstein }
       , { position=(100,-100), target=(0,0), state=Idle, direction=West, imgNumber=0, zombieType=Frankenstein }
       , { position=(100,0), target=(0,0), state=Idle, direction=North, imgNumber=0, zombieType=Brainy }
       , { position=(250,50), target=(0,0), state=Idle, direction=South, imgNumber=0, zombieType=Brainy }
       ]
-    , []
+    , [
+        -- outer frame
+       { start=(400,-300), end=(400,300) }
+      , { start=(-400,-300), end=(-400,300) }
+      , { start=(-400,300), end=(400,300) }
+      , { start=(-400,-300), end=(400,-300)}
+        -- walls, right room
+      , { start=(100,200), end=(400,200) }
+      , { start=(100,205), end=(100,150) }
+      , { start=(100,-300), end=(100,80)}
+        -- left room
+      , { start=(-100,-100), end=(-100,300)}
+      , { start=(-100,-300), end=(-100,-200)}
+      ]
     , []
     , Random.initialSeed 42
     )
@@ -137,6 +148,25 @@ renderZombies =
   List.map renderZombieImage
 
 
+renderWall : Wall -> Form
+renderWall wall =
+  let (x1, y1) = wall.start
+      (x2, y2) = wall.end
+      x = if x1 == x2 then 0 else x2 - x1
+      y = if y1 == y2 then 0 else y2 - y1
+      (d1, d2) = ( if x == 0 then 10 else x, if y == 0 then 10 else y)
+      (m1, m2) = ( (x2 + x1) / 2, (y2 + y1) / 2 )
+  in
+    rect (toFloat d1) (toFloat d2)
+      |> filled Color.darkGrey
+      |> move (m1, m2)
+
+
+renderWalls : List Wall -> List Form
+renderWalls =
+  List.map renderWall
+
+
 renderNoiseGenerator : NoiseGenerator -> Form
 renderNoiseGenerator noise =
   let (xPos,yPos) = noise.position
@@ -173,7 +203,10 @@ draw (w,h) (state,char,zombies,walls,noise,seed) =
     Start  -> renderMessage (w,h) "Please press space to start the game!"
     Move   -> collage w h
               (( renderPlayground (w,h))
-               :: (renderNoiseGenerators noise) ++ (renderPlayer char) ++ (renderZombies zombies))
+               :: (renderNoiseGenerators noise)
+               ++ (renderPlayer char)
+               ++ (renderZombies zombies)
+               ++ (renderWalls walls))
     Defeat -> renderMessage (w,h) "The zombies enjoyed your delicious brain..."
     Win    -> renderMessage (w,h) "Well done, survivor!"
 
@@ -217,6 +250,14 @@ winOrLose player zombies =
     else Move
 
 
+isWallCollision : Wall -> Position -> Bool
+isWallCollision wall pos =
+  let (x1,y1) = wall.start
+      (x2,y2) = wall.end
+      (o1,o2) = pos
+      
+
+
 directionHelper : { x:Int, y:Int } -> Direction -> Direction
 directionHelper userInput oldDirection =
   let heading = ( userInput.x, userInput.y )
@@ -226,7 +267,6 @@ directionHelper userInput oldDirection =
       ( 1, 0) -> East
       ( 0,-1) -> South
       ( 0, 1) -> North
-      -- why is this necessary?
       ( _, _) -> oldDirection
 
 
@@ -334,7 +374,7 @@ isNearHelper playerPos noise =
   List.any
     (\noise -> euclidianDistance playerPos noise.position < 30)
     -- this is not solved  very elegant...
-    ( { position=(-200,0) } :: noise )
+    ( { position=(-300,200) } :: noise )
 
 
 placeNoiseGenerator : Player -> List NoiseGenerator -> List NoiseGenerator
@@ -416,7 +456,7 @@ update userInput game =
 gameState : Signal Game
 gameState = Signal.foldp update initialGame
             (Signal.map2 (,)
-                     (Signal.sampleOn (Time.fps 60) Keyboard.arrows) Keyboard.space)
+                     (Signal.sampleOn (Time.fps 30) Keyboard.arrows) Keyboard.space)
 
 
 main : Signal Element
