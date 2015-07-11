@@ -193,10 +193,7 @@ renderNoiseGenerators =
 
 renderPlayground : (Int, Int) -> Form
 renderPlayground (w, h) =
-  let w' = toFloat w
-      h' = toFloat h
-  in
-    rect w' h' |> filled Color.grey
+  renderStaticImage (0,0) (800,600) "zombie_spielfeld2"
 
 
 renderMessage : (Int,Int) -> String -> Element
@@ -222,11 +219,10 @@ draw (w,h) (state,char,zombies,walls,noise,seed) =
 
 
 {-
- 
+
 Controller and Update
 
 -}
-
 toSoundHelper : Game -> String
 toSoundHelper (state,player,zombies,noise,walls,seed) =
    if | state == Move   -> "backgroundSound"
@@ -312,10 +308,10 @@ moveCharacter userInput player walls =
                   , imgNumber <- newImgNumber }
 
 
-updateZombieState : Zombie -> Player -> List NoiseGenerator -> ZombieState
-updateZombieState zombie player noise =
+updateZombieState : Zombie -> Position -> ZombieState
+updateZombieState zombie target =
   let zPos = zombie.position
-      pPos = player.position
+      pPos = target
       distance = euclidianDistance zPos pPos
   in
     if | distance < 200 -> Hunting
@@ -344,20 +340,30 @@ zombieMoveHelper (posX,posY) mFactor heading =
     North -> ( posX, posY + mFactor )
     South -> ( posX, posY - mFactor )
 
+getTarget : Zombie -> List Position -> Position
+getTarget zombie targets =
+  List.map (euclidianDistance zombie.target) targets
+  |> List.map2 (,) targets
+  |> List.sortBy (\(element, distance) -> distance)
+  |> List.map (\(element, distance) -> element)
+  |> List.head
+  |> Maybe.withDefault (0,0)
+
 
 moveZombie : Zombie -> Player -> List NoiseGenerator -> Direction -> List Wall -> Zombie
-moveZombie zombie target noise heading walls =
-  let speed = if zombie.state == Hunting
+moveZombie zombie player noise heading walls =
+  let target = getTarget zombie <| ( player.position :: List.map (\ele -> ele.position) noise )
+      speed = if zombie.state == Hunting
               then 3
               else zombieMoveFactor
       newDir = if zombie.state == Idle
                then heading
-               else determineDirection zombie target.position
+               else determineDirection zombie target
       newPos = zombieMoveHelper zombie.position speed heading
       collision = detectWallCollision newPos walls
       newState = if collision
                  then Idle
-                 else updateZombieState zombie target noise
+                 else updateZombieState zombie target
       newImgNumber = (zombie.imgNumber + 1) % 6
   in
     { zombie | position  <- if collision then zombie.position else newPos
