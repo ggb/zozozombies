@@ -84,9 +84,9 @@ initialGame : Game
 initialGame =
     ( Start
     , { position=(-300,200), target=(250,-100), noiseGeneratorCount=3, direction=East, imgNumber=0 }
-    , [ { position=(100,100), target=(0,0), state=Idle, direction=West, imgNumber=0, zombieType=Frankenstein }
-      , { position=(100,-100), target=(0,0), state=Idle, direction=West, imgNumber=0, zombieType=Frankenstein }
-      , { position=(100,0), target=(0,0), state=Idle, direction=North, imgNumber=0, zombieType=Brainy }
+    , [ { position=(150,100), target=(0,0), state=Idle, direction=West, imgNumber=0, zombieType=Frankenstein }
+      , { position=(150,-100), target=(0,0), state=Idle, direction=West, imgNumber=0, zombieType=Frankenstein }
+      , { position=(150,0), target=(0,0), state=Idle, direction=North, imgNumber=0, zombieType=Brainy }
       , { position=(250,50), target=(0,0), state=Idle, direction=South, imgNumber=0, zombieType=Brainy }
       ]
     , [
@@ -250,12 +250,25 @@ winOrLose player zombies =
     else Move
 
 
-isWallCollision : Wall -> Position -> Bool
-isWallCollision wall pos =
+isWallCollision : Position -> Wall -> Bool
+isWallCollision pos wall =
   let (x1,y1) = wall.start
       (x2,y2) = wall.end
       (o1,o2) = pos
-      
+      targetP = if x1 == x2 && (y1 - 10 <= o2 && o2 <= y2 + 10)
+                then Just (x1, o2)
+                else if y1 == y2  && (x1 - 10 <= o1 && o1 <= x2 + 10)
+                     then Just (o1, y1)
+                     else Nothing
+  in
+    case targetP of
+      Just point -> euclidianDistance pos point < 10
+      Nothing    -> False
+
+
+detectWallCollision : Position -> List Wall -> Bool
+detectWallCollision pos =
+  List.any (isWallCollision pos)
 
 
 directionHelper : { x:Int, y:Int } -> Direction -> Direction
@@ -270,14 +283,15 @@ directionHelper userInput oldDirection =
       ( _, _) -> oldDirection
 
 
-moveCharacter : { x:Int, y:Int } -> Player -> Player
-moveCharacter userInput player =
+moveCharacter : { x:Int, y:Int } -> Player -> List Wall -> Player
+moveCharacter userInput player walls =
   let (xPos,yPos) = player.position
       newPos = ( xPos + userInput.x * moveFactor, yPos + userInput.y * moveFactor )
+      collision = detectWallCollision newPos walls
       newDirection = directionHelper userInput player.direction
       newImgNumber = (player.imgNumber + 1) % 6
   in
-    if userInput == { x=0, y=0 }
+    if userInput == { x=0, y=0 } || collision
     then player
     else { player | position <- newPos
                   , direction <- newDirection
@@ -315,6 +329,9 @@ zombieMoveHelper (posX,posY) mFactor heading =
     East  -> ( posX + mFactor, posY )
     North -> ( posX, posY + mFactor )
     South -> ( posX, posY - mFactor )
+
+
+
 
 
 idleZombieMove : Zombie -> Player -> List NoiseGenerator -> Direction -> Zombie
@@ -434,7 +451,7 @@ update userInput game =
         else game
       Move   ->
         ( winOrLose player zombies
-        , moveCharacter arrows player
+        , moveCharacter arrows player walls
         , moveZombies player noise headings zombies
         , walls
         , if space
