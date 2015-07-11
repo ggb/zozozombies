@@ -345,8 +345,20 @@ getTarget zombie targets =
   |> Maybe.withDefault (0,0)
 
 
-moveZombie : Zombie -> Player -> List NoiseGenerator -> Direction -> List Wall -> Zombie
-moveZombie zombie player noise heading walls =
+otherZombieHelper : Zombie -> Zombie -> Bool
+otherZombieHelper fst scd =
+  if fst.position == scd.position
+  then False
+  else euclidianDistance fst.position scd.position < 10
+
+
+isOtherZombieNear : Zombie -> List Zombie -> Bool
+isOtherZombieNear zombie =
+  List.any (\other -> otherZombieHelper zombie other)
+
+
+moveZombie : Zombie -> List Zombie -> Player -> List NoiseGenerator -> Direction -> List Wall -> Zombie
+moveZombie zombie zombies player noise heading walls =
   let target = getTarget zombie <| ( player.position :: List.map (\ele -> ele.position) noise )
       speed = if zombie.state == Hunting
               then 3
@@ -356,7 +368,8 @@ moveZombie zombie player noise heading walls =
                else determineDirection zombie target
       newPos = zombieMoveHelper zombie.position speed heading
       collision = detectWallCollision newPos walls
-      newState = if collision
+      zombieCollision = isOtherZombieNear zombie zombies
+      newState = if collision || zombieCollision
                  then Idle
                  else updateZombieState zombie target
       newImgNumber = (zombie.imgNumber + 1) % 6
@@ -369,7 +382,7 @@ moveZombie zombie player noise heading walls =
 
 moveZombies : Player -> List NoiseGenerator -> List Direction -> List Wall ->  List Zombie -> List Zombie
 moveZombies player noise headings walls  zombies =
-  List.map ( \(zombie, heading) -> moveZombie zombie player noise heading walls)
+  List.map ( \(zombie, heading) -> moveZombie zombie zombies player noise heading walls)
   <| List.map2 (,)  zombies headings
 
 
