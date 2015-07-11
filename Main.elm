@@ -349,7 +349,7 @@ otherZombieHelper : Zombie -> Zombie -> Bool
 otherZombieHelper fst scd =
   if fst.position == scd.position
   then False
-  else euclidianDistance fst.position scd.position < 10
+  else euclidianDistance fst.position scd.position < 20
 
 
 isOtherZombieNear : Zombie -> List Zombie -> Bool
