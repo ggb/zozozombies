@@ -122,9 +122,8 @@ View
 
 -}
 renderImage : Position -> Direction -> Int -> String -> Form
-renderImage position direction imgNumber name =
-  let (xPos,yPos) = position
-      path = "res/img/" ++ name ++ (toString <| imgNumber + 1) ++ ".png"
+renderImage (xPos,yPos) direction imgNumber name =
+  let path = "res/img/" ++ name ++ (toString <| imgNumber + 1) ++ ".png"
       img = toForm (image 25 25 path) |> move ((toFloat xPos), (toFloat yPos))
   in
     case direction of
@@ -132,6 +131,13 @@ renderImage position direction imgNumber name =
       West  -> rotate (degrees 90) img
       South -> rotate (degrees 180) img
       East  -> rotate (degrees 270) img
+
+
+renderStaticImage : Position -> (Int, Int) -> String -> Form
+renderStaticImage (xPos, yPos) (dimX, dimY) name =
+  let path = "res/img/" ++ name ++ ".png"
+  in
+    toForm (image dimX dimY path) |> move ((toFloat xPos), (toFloat yPos))
 
 
 renderZombieImage : Zombie -> Form
@@ -143,12 +149,8 @@ renderZombieImage zombie =
 
 renderPlayer : Player -> List Form
 renderPlayer player =
-  let (targetX,targetY) = player.target
-  in
     [ renderImage player.position player.direction player.imgNumber "erdling_"
-    , rect 25 25
-      |> filled Color.green
-      |> move ((toFloat targetX), (toFloat targetY))
+    , renderStaticImage player.target (60,20) "kettensaege"
     ]
 
 renderZombies : List Zombie -> List Form
@@ -229,6 +231,7 @@ toSoundHelper : Game -> String
 toSoundHelper (state,player,zombies,noise,walls,seed) =
    if | state == Move   -> "backgroundSound"
       | state == Defeat -> "defeat"
+      | state == Win    -> "chainsaw"
       | otherwise       -> ""
 
 port handleSound : Signal String
@@ -456,7 +459,7 @@ update userInput game =
 gameState : Signal Game
 gameState = Signal.foldp update initialGame
             (Signal.map2 (,)
-                     (Signal.sampleOn (Time.fps 60) Keyboard.arrows) Keyboard.space)
+                     (Signal.sampleOn (Time.fps 40) Keyboard.arrows) Keyboard.space)
 
 
 main : Signal Element
