@@ -96,6 +96,10 @@ initialGame =
       , { position=(-250,-150), target=(0,0), state=Idle, direction=North, imgNumber=0, zombieType=Frankenstein }
       , { position=(250,250), target=(0,0), state=Idle, direction=West, imgNumber=0, zombieType=Brainy }
       , { position=(0,0), target=(0,0), state=Idle, direction=South, imgNumber=0, zombieType=Frankenstein }
+      , { position=(250,250), target=(0,0), state=Idle, direction=West, imgNumber=0, zombieType=Brainy }
+      , { position=(50,50), target=(0,0), state=Idle, direction=South, imgNumber=0, zombieType=Frankenstein }
+      , { position=(200,150), target=(0,0), state=Idle, direction=West, imgNumber=0, zombieType=Brainy }
+      , { position=(-50,-50), target=(0,0), state=Idle, direction=South, imgNumber=0, zombieType=Frankenstein }
       ]
     , [
         -- outer frame
