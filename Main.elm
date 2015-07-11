@@ -88,13 +88,21 @@ initialGame =
       , { position=(150,-100), target=(0,0), state=Idle, direction=West, imgNumber=0, zombieType=Frankenstein }
       , { position=(150,0), target=(0,0), state=Idle, direction=North, imgNumber=0, zombieType=Brainy }
       , { position=(250,50), target=(0,0), state=Idle, direction=South, imgNumber=0, zombieType=Brainy }
+      , { position=(0,50), target=(0,0), state=Idle, direction=South, imgNumber=0, zombieType=Brainy }
+      , { position=(0,100), target=(0,0), state=Idle, direction=South, imgNumber=0, zombieType=Frankenstein }
+      , { position=(50,-150), target=(0,0), state=Idle, direction=East, imgNumber=0, zombieType=Frankenstein }
+      , { position=(-50,-250), target=(0,0), state=Idle, direction=South, imgNumber=0, zombieType=Brainy }
+      , { position=(-250,-250), target=(0,0), state=Idle, direction=North, imgNumber=0, zombieType=Brainy }
+      , { position=(-250,-150), target=(0,0), state=Idle, direction=North, imgNumber=0, zombieType=Frankenstein }
+      , { position=(250,250), target=(0,0), state=Idle, direction=West, imgNumber=0, zombieType=Brainy }
+      , { position=(0,0), target=(0,0), state=Idle, direction=South, imgNumber=0, zombieType=Frankenstein }
       ]
     , [
         -- outer frame
-       { start=(400,-300), end=(400,300) }
-      , { start=(-400,-300), end=(-400,300) }
-      , { start=(-400,300), end=(400,300) }
-      , { start=(-400,-300), end=(400,-300)}
+       { start=(405,-300), end=(405,300) }
+      , { start=(-405,-300), end=(-405,300) }
+      , { start=(-400,305), end=(400,305) }
+      , { start=(-400,-305), end=(400,-305)}
         -- walls, right room
       , { start=(100,200), end=(400,200) }
       , { start=(100,205), end=(100,150) }
@@ -304,8 +312,8 @@ updateZombieState zombie player noise =
       pPos = player.position
       distance = euclidianDistance zPos pPos
   in
-    if | distance < 125 -> Hunting
-       | distance < 200 -> Aggressive
+    if | distance < 200 -> Hunting
+       | distance < 300 -> Aggressive
        | otherwise      -> Idle
 
 
@@ -347,9 +355,9 @@ moveZombie zombie target noise heading walls =
       newImgNumber = (zombie.imgNumber + 1) % 6
   in
     { zombie | position  <- if collision then zombie.position else newPos
-    , direction <- heading
-    , state     <- newState
-    , imgNumber <- newImgNumber}
+             , direction <- newDir
+             , state     <- newState
+             , imgNumber <- newImgNumber}
 
 
 moveZombies : Player -> List NoiseGenerator -> List Direction -> List Wall ->  List Zombie -> List Zombie
@@ -445,7 +453,7 @@ update userInput game =
 gameState : Signal Game
 gameState = Signal.foldp update initialGame
             (Signal.map2 (,)
-                     (Signal.sampleOn (Time.fps 30) Keyboard.arrows) Keyboard.space)
+                     (Signal.sampleOn (Time.fps 60) Keyboard.arrows) Keyboard.space)
 
 
 main : Signal Element
