@@ -131,7 +131,7 @@ View
 renderImage : Position -> Direction -> Int -> String -> Form
 renderImage (xPos,yPos) direction imgNumber name =
   let path = "res/img/" ++ name ++ (toString <| imgNumber + 1) ++ ".png"
-      img = toForm (image 25 25 path) |> move ((toFloat xPos), (toFloat yPos))
+      img = toForm (image 35 35 path) |> move ((toFloat xPos), (toFloat yPos))
   in
     case direction of
       North -> img
